@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wordle · chirag.chill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1b1f2e; --bg-soft: #20263a; --surface: #242a3d; --surface-hover: #2b3250;
+    --border: #383f5c; --text: #ede7da; --text-muted: #9aa0bd;
+    --amber: #e8a854; --amber-dim: rgba(232,168,84,0.16); --sage: #7fb3a3; --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Nunito Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+  h1, h2 { font-family: 'Fraunces', serif; font-weight: 600; margin: 0; }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+  .topbar { display: flex; padding: 20px clamp(20px,6vw,56px); }
+  .topbar a { font-family: 'Fraunces', serif; font-size: 1rem; color: var(--text-muted); transition: color .15s ease; }
+  .topbar a:hover { color: var(--amber); }
+
+  main { max-width: 420px; margin: 0 auto; padding: 6px 20px 60px; text-align: center; }
+  h1.title { font-size: 2rem; margin-bottom: 14px; }
+
+  .msg { min-height: 1.6em; margin-bottom: 14px; font-weight: 700; color: var(--amber); }
+  .msg.error { color: #d9705a; }
+  .msg.win { color: var(--sage); }
+
+  .grid { display: grid; grid-template-rows: repeat(6, 1fr); gap: 6px; margin: 0 auto 24px; max-width: 300px; }
+  .grid-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .tile {
+    aspect-ratio: 1; border: 2px solid var(--border); border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif; font-weight: 700; font-size: 1.5rem; text-transform: uppercase;
+    background: var(--bg-soft); transition: transform .15s ease;
+  }
+  .tile.filled { border-color: #4a5580; }
+  .tile.correct { background: var(--sage); border-color: var(--sage); color: #12261f; }
+  .tile.present { background: var(--amber); border-color: var(--amber); color: #1b1f2e; }
+  .tile.absent { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+  .grid-row.shake { animation: shake .3s ease; }
+  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+  @media (prefers-reduced-motion: reduce) { .grid-row.shake { animation: none; } }
+
+  .keyboard { display: flex; flex-direction: column; gap: 6px; max-width: 480px; margin: 0 auto 20px; }
+  .krow { display: flex; justify-content: center; gap: 5px; }
+  .key {
+    background: var(--surface); border: none; color: var(--text); border-radius: 6px;
+    padding: 12px 0; min-width: 30px; flex: 1; max-width: 40px;
+    font-family: 'Nunito Sans', sans-serif; font-weight: 700; font-size: 0.85rem; cursor: pointer;
+  }
+  .key.wide { max-width: 62px; font-size: 0.68rem; }
+  .key:hover { background: var(--surface-hover); }
+  .key.correct { background: var(--sage); color: #12261f; }
+  .key.present { background: var(--amber); color: #1b1f2e; }
+  .key.absent { background: var(--bg-soft); color: var(--text-muted); }
+
+  .reset-btn {
+    background: var(--amber); color: #1b1f2e; border: none; padding: 11px 26px; border-radius: 999px;
+    font-family: 'Nunito Sans', sans-serif; font-weight: 800; font-size: 0.9rem; cursor: pointer;
+  }
+  .reset-btn:hover { opacity: 0.9; }
+</style>
+</head>
+<body>
+
+<div class="topbar"><a href="index.html">&larr; chirag.chill</a></div>
+
+<main>
+  <h1 class="title">Wordle</h1>
+  <p class="msg" id="msg">Guess the five-letter word.</p>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="keyboard" id="keyboard"></div>
+
+  <button class="reset-btn" id="resetBtn">New word</button>
+</main>
+
+<script>
+  const WORDS = ["ABOUT","ABOVE","ABUSE","ACTOR","ACUTE","ADMIT","ADOPT","ADULT","AFTER","AGAIN","AGENT","AGREE","AHEAD","ALARM","ALBUM","ALERT","ALIKE","ALIVE","ALLOW","ALONE","ALONG","ALTER","AMONG","ANGER","ANGLE","ANGRY","APART","APPLE","APPLY","ARENA","ARGUE","ARISE","ARRAY","ASIDE","ASSET","AUDIO","AVOID","AWAKE","AWARD","AWARE","BADLY","BAKER","BASIC","BASIS","BEACH","BEGAN","BEGIN","BEING","BELOW","BENCH","BIRTH","BLACK","BLAME","BLANK","BLAST","BLIND","BLOCK","BLOOD","BOARD","BOAST","BONUS","BOOST","BOUND","BRAIN","BRAND","BREAD","BREAK","BREED","BRICK","BRIEF","BRING","BROAD","BROKE","BROWN","BUILD","BUILT","BUYER","CABLE","CANDY","CARGO","CARRY","CATCH","CAUSE","CHAIN","CHAIR","CHALK","CHAOS","CHARM","CHART","CHASE","CHEAP","CHECK","CHEST","CHIEF","CHILD","CHILL","CLAIM","CLASS","CLEAN","CLEAR","CLICK","CLIMB","CLOCK","CLOSE","CLOUD","COACH","COAST","COULD","COUNT","COURT","COVER","CRAFT","CRASH","CRAZY","CREAM","CRIME","CROSS","CROWD","CROWN","CRUEL","CURVE","CYCLE","DAILY","DANCE","DEATH","DELAY","DEPTH","DIRTY","DOUBT","DOZEN","DRAFT","DRAMA","DRANK","DREAM","DRESS","DRIED","DRIVE","EARLY","EARTH","EIGHT","ELITE","EMPTY","ENEMY","ENJOY","ENTER","ENTRY","EQUAL","ERROR","EVENT","EVERY","EXACT","EXIST","EXTRA","FAITH","FALSE","FAULT","FIBER","FIELD","FIGHT","FINAL","FIRST","FLASH","FLEET","FLOOR","FLUID","FOCUS","FORCE","FORTH","FORTY","FORUM","FOUND","FRAME","FRESH","FRONT","FROST","FRUIT","FUNNY","GAMER","GHOST","GIANT","GLASS","GLOBE","GLORY","GOODS","GRACE","GRADE","GRAND","GRANT","GRASS","GREAT","GREEN","GRIEF","GROSS","GROUP","GROWN","GUARD","GUESS","GUEST","GUIDE","HAPPY","HARSH","HEART","HEAVY","HELLO","HENCE","HONOR","HORSE","HOTEL","HOUSE","HUMAN","HUMOR","IDEAL","IMAGE","INDEX","INNER","INPUT","ISSUE","IVORY","JOINT","JUDGE","JUICE","JUMBO","KNIFE","KNOWN","LABEL","LARGE","LASER","LATER","LAUGH","LAYER","LEARN","LEAST","LEAVE","LEGAL","LEMON","LEVEL","LIGHT","LIMIT","LOGIC","LOOSE","LOWER","LOYAL","LUCKY","LUNCH","LYRIC","MAGIC","MAJOR","MAKER","MARCH","MATCH","MAYBE","MEDIA","MERIT","METAL","MIGHT","MINOR","MODEL","MONEY","MONTH","MORAL","MOTOR","MOUNT","MOUSE","MOUTH","MOVIE","MUSIC","NAKED","NAMED","NASTY","NAVAL","NERVE","NEVER","NEWLY","NIGHT","NOBLE","NOISE","NORTH","NOTED","NOVEL","NURSE","OCEAN","OFFER","OFTEN","OLIVE","ORDER","OTHER","OUGHT","OUTER","OWNER","PAINT","PANEL","PAPER","PARTY","PATCH","PAUSE","PEACE","PHASE","PHONE","PHOTO","PIANO","PIECE","PILOT","PITCH","PIZZA","PLACE","PLAIN","PLANE","PLANT","PLATE","POINT","POUND","POWER","PRESS","PRICE","PRIDE","PRIME","PRINT","PRIOR","PRIZE","PROOF","PROUD","PROVE","QUEEN","QUERY","QUICK","QUIET","QUITE","QUOTE","RADIO","RAISE","RANGE","RAPID","RATIO","REACH","READY","REALM","REBEL","REFER","RELAX","REPLY","RIDGE","RIGHT","RIVAL","RIVER","ROBIN","ROBOT","ROUGH","ROUND","ROUTE","ROYAL","RURAL","SADLY","SALAD","SALES","SAUCE","SCALE","SCENE","SCOPE","SCORE","SENSE","SERVE","SEVEN","SHADE","SHAKE","SHALL","SHAPE","SHARE","SHARP","SHEEP","SHEET","SHELF","SHELL","SHIFT","SHINE","SHIRT","SHOCK","SHOOT","SHORT","SHOWN","SIGHT","SILLY","SINCE","SIXTH","SIXTY","SIZED","SKILL","SLEEP","SLICE","SLIDE","SMALL","SMART","SMILE","SMOKE","SNAKE","SOLAR","SOLID","SOLVE","SORRY","SOUND","SOUTH","SPACE","SPARE","SPEAK","SPEED","SPELL","SPEND","SPENT","SPICE","SPLIT","SPOKE","SPORT","STAFF","STAGE","STAIR","STAKE","STAND","START","STATE","STEAM","STEEL","STEEP","STICK","STILL","STOCK","STONE","STOOD","STORE","STORM","STORY","STOVE","STUDY","STUFF","STYLE","SUGAR","SUPER","SWEET","SWIFT","SWING","TABLE","TASTE","TEACH","THANK","THEFT","THEIR","THEME","THERE","THESE","THICK","THING","THINK","THIRD","THOSE","THREE","THREW","THROW","TIGHT","TIMER","TIRED","TITLE","TOAST","TODAY","TOKEN","TOOTH","TOPIC","TOTAL","TOUCH","TOUGH","TOWER","TRACK","TRADE","TRAIL","TRAIN","TREAT","TREND","TRIAL","TRIBE","TRICK","TRIED","TRUCK","TRULY","TRUNK","TRUST","TRUTH","TWICE","UNCLE","UNDER","UNION","UNITY","UNTIL","UPPER","UPSET","URBAN","USAGE","USUAL","VALID","VALUE","VAPOR","VIDEO","VIRUS","VISIT","VITAL","VOCAL","VOICE","WASTE","WATCH","WATER","WHEAT","WHEEL","WHERE","WHICH","WHILE","WHITE","WHOLE","WHOSE","WOMAN","WOMEN","WORLD","WORRY","WORSE","WORST","WORTH","WOULD","WOUND","WRITE","WRONG","YOUNG","YOUTH"];
+
+  const KEY_ROWS = [
+    "QWERTYUIOP".split(""),
+    "ASDFGHJKL".split(""),
+    ["ENTER", ..."ZXCVBNM".split(""), "BACK"]
+  ];
+
+  let answer = "";
+  let guesses = [];
+  let current = "";
+  let gameOver = false;
+  const keyStates = {};
+
+  const gridEl = document.getElementById('grid');
+  const keyboardEl = document.getElementById('keyboard');
+  const msgEl = document.getElementById('msg');
+
+  function pickAnswer() {
+    return WORDS[Math.floor(Math.random() * WORDS.length)];
+  }
+
+  function evaluateGuess(guess, ans) {
+    const result = Array(5).fill('absent');
+    const counts = {};
+    for (const ch of ans) counts[ch] = (counts[ch] || 0) + 1;
+    for (let i = 0; i < 5; i++) {
+      if (guess[i] === ans[i]) { result[i] = 'correct'; counts[guess[i]]--; }
+    }
+    for (let i = 0; i < 5; i++) {
+      if (result[i] === 'correct') continue;
+      const ch = guess[i];
+      if (counts[ch] > 0) { result[i] = 'present'; counts[ch]--; }
+    }
+    return result;
+  }
+
+  function renderGrid(shakeRow) {
+    gridEl.innerHTML = '';
+    for (let r = 0; r < 6; r++) {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'grid-row' + (shakeRow === r ? ' shake' : '');
+      const guess = guesses[r];
+      const letters = guess ? guess.word.split('') : (r === guesses.length ? current.split('') : []);
+      for (let c = 0; c < 5; c++) {
+        const tile = document.createElement('div');
+        tile.className = 'tile';
+        const letter = letters[c] || '';
+        tile.textContent = letter;
+        if (letter) tile.classList.add('filled');
+        if (guess) tile.classList.add(guess.result[c]);
+        rowEl.appendChild(tile);
+      }
+      gridEl.appendChild(rowEl);
+    }
+  }
+
+  function renderKeyboard() {
+    keyboardEl.innerHTML = '';
+    KEY_ROWS.forEach(row => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'krow';
+      row.forEach(k => {
+        const btn = document.createElement('button');
+        btn.className = 'key' + (k === 'ENTER' || k === 'BACK' ? ' wide' : '');
+        btn.textContent = k === 'BACK' ? 'DEL' : k;
+        if (keyStates[k]) btn.classList.add(keyStates[k]);
+        btn.addEventListener('click', () => pressKey(k));
+        rowEl.appendChild(btn);
+      });
+      keyboardEl.appendChild(rowEl);
+    });
+  }
+
+  function setMsg(text, type) {
+    msgEl.textContent = text;
+    msgEl.className = 'msg' + (type ? ' ' + type : '');
+  }
+
+  function pressKey(k) {
+    if (gameOver) return;
+    if (k === 'BACK') {
+      current = current.slice(0, -1);
+      renderGrid();
+      return;
+    }
+    if (k === 'ENTER') {
+      submitGuess();
+      return;
+    }
+    if (current.length < 5 && /^[A-Z]$/.test(k)) {
+      current += k;
+      renderGrid();
+    }
+  }
+
+  function submitGuess() {
+    if (current.length < 5) {
+      setMsg('Not enough letters', 'error');
+      renderGrid(guesses.length);
+      return;
+    }
+    if (!WORDS.includes(current)) {
+      setMsg('Not in word list', 'error');
+      renderGrid(guesses.length);
+      return;
+    }
+    const result = evaluateGuess(current, answer);
+    guesses.push({ word: current, result });
+    current.split('').forEach((ch, i) => {
+      const r = result[i];
+      const rank = { absent: 0, present: 1, correct: 2 };
+      if (!keyStates[ch] || rank[r] > rank[keyStates[ch]]) keyStates[ch] = r;
+    });
+    const won = result.every(r => r === 'correct');
+    current = '';
+    renderGrid();
+    renderKeyboard();
+    if (won) {
+      gameOver = true;
+      setMsg('You got it!', 'win');
+    } else if (guesses.length === 6) {
+      gameOver = true;
+      setMsg('The word was ' + answer, 'error');
+    } else {
+      setMsg('Guess the five-letter word.');
+    }
+  }
+
+  document.addEventListener('keydown', e => {
+    const k = e.key.toUpperCase();
+    if (k === 'ENTER') pressKey('ENTER');
+    else if (k === 'BACKSPACE') pressKey('BACK');
+    else if (/^[A-Z]$/.test(k)) pressKey(k);
+  });
+
+  function newGame() {
+    answer = pickAnswer();
+    guesses = [];
+    current = '';
+    gameOver = false;
+    Object.keys(keyStates).forEach(k => delete keyStates[k]);
+    setMsg('Guess the five-letter word.');
+    renderGrid();
+    renderKeyboard();
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', newGame);
+
+  newGame();
+</script>
+
+</body>
+</html>

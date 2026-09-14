@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sudoku · chirag.chill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Nunito+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1b1f2e; --bg-soft: #20263a; --surface: #242a3d; --surface-hover: #2b3250;
+    --border: #383f5c; --text: #ede7da; --text-muted: #9aa0bd;
+    --amber: #e8a854; --amber-dim: rgba(232,168,84,0.16); --sage: #7fb3a3; --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: 'Nunito Sans', sans-serif; -webkit-font-smoothing: antialiased; }
+  h1, h2 { font-family: 'Fraunces', serif; font-weight: 600; margin: 0; }
+  a { color: inherit; text-decoration: none; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+  .topbar { display: flex; padding: 20px clamp(20px,6vw,56px); }
+  .topbar a { font-family: 'Fraunces', serif; font-size: 1rem; color: var(--text-muted); transition: color .15s ease; }
+  .topbar a:hover { color: var(--amber); }
+
+  main { max-width: 420px; margin: 0 auto; padding: 6px 20px 70px; text-align: center; }
+  h1.title { font-size: 2rem; margin-bottom: 16px; }
+
+  .diffs { display: flex; justify-content: center; gap: 8px; margin-bottom: 16px; }
+  .diff-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+    padding: 7px 14px; border-radius: 999px; font-size: 0.82rem; cursor: pointer; transition: all .15s ease;
+  }
+  .diff-btn.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+
+  .msg { min-height: 1.5em; margin-bottom: 14px; color: var(--sage); font-weight: 700; }
+
+  .board {
+    display: grid; grid-template-columns: repeat(9, 1fr);
+    max-width: 342px; margin: 0 auto 18px; background: var(--border); border: 2px solid var(--amber);
+    border-radius: 6px; overflow: hidden;
+  }
+  .cell {
+    aspect-ratio: 1; background: var(--bg-soft); border: 0.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif; font-size: 1.1rem; cursor: pointer; color: var(--text); user-select: none;
+  }
+  .cell.given { color: var(--text-muted); font-weight: 600; cursor: default; }
+  .cell.b-right { border-right: 2px solid var(--amber); }
+  .cell.b-bottom { border-bottom: 2px solid var(--amber); }
+  .cell.peer { background: var(--surface); }
+  .cell.same-value { color: var(--amber); }
+  .cell.selected { background: var(--amber-dim); }
+  .cell.conflict { background: rgba(217,112,90,0.25); color: #d9705a; }
+
+  .numpad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; max-width: 342px; margin: 0 auto 18px; }
+  .num-btn {
+    background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px;
+    padding: 12px 0; font-family: 'Fraunces', serif; font-size: 1.1rem; cursor: pointer;
+  }
+  .num-btn:hover { background: var(--surface-hover); }
+
+  .actions { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .reset-btn, .link-btn {
+    border: none; border-radius: 999px; font-family: 'Nunito Sans', sans-serif; font-weight: 800;
+    font-size: 0.9rem; cursor: pointer; padding: 11px 24px;
+  }
+  .reset-btn { background: var(--amber); color: #1b1f2e; }
+  .reset-btn:hover { opacity: 0.9; }
+  .link-btn { background: transparent; color: var(--text-muted); font-weight: 600; }
+  .link-btn:hover { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<div class="topbar"><a href="index.html">&larr; chirag.chill</a></div>
+
+<main>
+  <h1 class="title">Sudoku</h1>
+
+  <div class="diffs">
+    <button class="diff-btn" data-d="easy">Easy</button>
+    <button class="diff-btn active" data-d="medium">Medium</button>
+    <button class="diff-btn" data-d="hard">Hard</button>
+  </div>
+
+  <p class="msg" id="msg">Pick a cell, then a number.</p>
+
+  <div class="board" id="board"></div>
+
+  <div class="numpad" id="numpad"></div>
+
+  <div class="actions">
+    <button class="reset-btn" id="newBtn">New game</button>
+    <button class="link-btn" id="solveBtn">Show solution</button>
+  </div>
+</main>
+
+<script>
+  const CLUES = { easy: 40, medium: 32, hard: 26 };
+  let difficulty = 'medium';
+  let solution = [];
+  let puzzle = [];
+  let current = [];
+  let given = [];
+  let selected = null;
+
+  const boardEl = document.getElementById('board');
+  const numpadEl = document.getElementById('numpad');
+  const msgEl = document.getElementById('msg');
+
+  function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function generateSolvedGrid() {
+    const base = 3, side = 9;
+    const pattern = (r, c) => (base * (r % base) + Math.floor(r / base) + c) % side;
+    const rBase = [0, 1, 2];
+    const rows = [].concat(...shuffle(rBase.map(g => shuffle(rBase.slice()).map(r => g * base + r))));
+    const cols = [].concat(...shuffle(rBase.map(g => shuffle(rBase.slice()).map(c => g * base + c))));
+    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    return rows.map(r => cols.map(c => nums[pattern(r, c)]));
+  }
+
+  function makePuzzle(sol, clueCount) {
+    const p = sol.map(row => row.slice());
+    const cells = [];
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) cells.push([r, c]);
+    shuffle(cells);
+    const toRemove = 81 - clueCount;
+    for (let i = 0; i < toRemove; i++) {
+      const [r, c] = cells[i];
+      p[r][c] = 0;
+    }
+    return p;
+  }
+
+  function computeConflicts() {
+    const conflicts = Array.from({ length: 9 }, () => Array(9).fill(false));
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const v = current[r][c];
+        if (!v) continue;
+        for (let c2 = 0; c2 < 9; c2++) {
+          if (c2 !== c && current[r][c2] === v) conflicts[r][c] = true;
+        }
+        for (let r2 = 0; r2 < 9; r2++) {
+          if (r2 !== r && current[r2][c] === v) conflicts[r][c] = true;
+        }
+        const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+        for (let rr = br; rr < br + 3; rr++) {
+          for (let cc = bc; cc < bc + 3; cc++) {
+            if ((rr !== r || cc !== c) && current[rr][cc] === v) conflicts[r][c] = true;
+          }
+        }
+      }
+    }
+    return conflicts;
+  }
+
+  function isComplete(conflicts) {
+    for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+      if (!current[r][c] || conflicts[r][c]) return false;
+    }
+    return true;
+  }
+
+  function render() {
+    const conflicts = computeConflicts();
+    boardEl.innerHTML = '';
+    for (let r = 0; r < 9; r++) {
+      for (let c = 0; c < 9; c++) {
+        const div = document.createElement('div');
+        const v = current[r][c];
+        let cls = 'cell';
+        if (given[r][c]) cls += ' given';
+        if (c % 3 === 2 && c !== 8) cls += ' b-right';
+        if (r % 3 === 2 && r !== 8) cls += ' b-bottom';
+        if (selected) {
+          const [sr, sc] = selected;
+          const sameBox = Math.floor(sr / 3) === Math.floor(r / 3) && Math.floor(sc / 3) === Math.floor(c / 3);
+          if (sr === r || sc === c || sameBox) cls += ' peer';
+          if (sr === r && sc === c) cls += ' selected';
+          if (v && current[sr][sc] && v === current[sr][sc] && !(sr === r && sc === c)) cls += ' same-value';
+        }
+        if (conflicts[r][c]) cls += ' conflict';
+        div.className = cls;
+        div.textContent = v || '';
+        div.addEventListener('click', () => selectCell(r, c));
+        boardEl.appendChild(div);
+      }
+    }
+    if (isComplete(conflicts)) {
+      msgEl.textContent = 'Solved! Nicely done.';
+    } else {
+      msgEl.textContent = 'Pick a cell, then a number.';
+    }
+  }
+
+  function selectCell(r, c) {
+    if (given[r][c]) { selected = [r, c]; render(); return; }
+    selected = [r, c];
+    render();
+  }
+
+  function setValue(v) {
+    if (!selected) return;
+    const [r, c] = selected;
+    if (given[r][c]) return;
+    current[r][c] = v;
+    render();
+  }
+
+  function renderNumpad() {
+    numpadEl.innerHTML = '';
+    for (let n = 1; n <= 9; n++) {
+      const btn = document.createElement('button');
+      btn.className = 'num-btn';
+      btn.textContent = n;
+      btn.addEventListener('click', () => setValue(n));
+      numpadEl.appendChild(btn);
+    }
+    const erase = document.createElement('button');
+    erase.className = 'num-btn';
+    erase.textContent = '⌫';
+    erase.addEventListener('click', () => setValue(0));
+    numpadEl.appendChild(erase);
+  }
+
+  document.addEventListener('keydown', e => {
+    if (!selected) return;
+    if (/^[1-9]$/.test(e.key)) setValue(Number(e.key));
+    else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') setValue(0);
+  });
+
+  document.querySelectorAll('.diff-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      difficulty = btn.dataset.d;
+      newGame();
+    });
+  });
+
+  document.getElementById('newBtn').addEventListener('click', newGame);
+  document.getElementById('solveBtn').addEventListener('click', () => {
+    current = solution.map(row => row.slice());
+    selected = null;
+    render();
+  });
+
+  function newGame() {
+    solution = generateSolvedGrid();
+    puzzle = makePuzzle(solution, CLUES[difficulty]);
+    current = puzzle.map(row => row.slice());
+    given = puzzle.map(row => row.map(v => v !== 0));
+    selected = null;
+    render();
+  }
+
+  renderNumpad();
+  newGame();
+</script>
+
+</body>
+</html>
